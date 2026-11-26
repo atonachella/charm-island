@@ -1,0 +1,18 @@
+{
+ "name": "Purrch",
+ "short_name": "Purrch",
+ "start_url": "./",
+ "scope": "./",
+ "display": "fullscreen",
+ "orientation": "any",
+ "background_color": "#1b3a52",
+ "theme_color": "#1b3a52",
+ "icons": [
+  {
+   "src": "icon.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  }
+ ]
+}
