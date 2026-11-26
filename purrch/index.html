@@ -668,12 +668,12 @@ html[class*="g-"] .wmap{background:linear-gradient(180deg,var(--r7h1),var(--r7h2
 <div id="grown" class="screen modal">
   <div class="card">
     <h2>For Grown-Ups</h2>
-    <div class="gu">
+    <div class="gu"><!--R7GU--><h3>Getting it on a tablet</h3><p>Open <b>https://atonachella.github.io/charm-island/purrch/</b> in the tablet's web browser. To keep it like an app: Chrome menu (&#8942;) &rarr; <b>Add to Home screen</b> (Safari: Share &rarr; Add to Home Screen). On a kids tablet with web limits, add <b>atonachella.github.io</b> to the allowed sites in the parent settings.</p><p>New versions show up at the same address. Progress is kept between versions. If an old version shows, close the game and open it again.</p><p>Graphics adjust on their own: slower tablets get softer shadows, a lower resolution and a shorter view distance.</p><p class="small">Version 1.0</p>
       <p><b>Purrch</b> is a pretend pet game. Kids adopt cats and birds, name them, feed them, play with them, brush them and tuck them in for naps. Taking care of pets earns hearts, and hearts unlock new pets and rooms. At 25 hearts the Pizza Café opens: make a pizza, then deliver it to one of four animal friends (two live across a little hop-across course). At 50 hearts the 3D Printer Room opens: pick an animal mold and a color, then tap along to print it layer by layer. Prints go on a shelf and can be given to pets as toys.</p>
       <h3>Safe by design</h3>
       <ul>
         <li>No ads, no chat, no purchases, no accounts, no links.</li>
-        <li>Nothing is sent over the internet. It works offline once open.</li>
+        <li>The game loads once from its web address. After that nothing is sent anywhere: no tracking, no data collected.</li>
         <li>Progress saves only in this browser, on this tablet.</li>
       </ul>
       <h3>Gentle by design</h3>
@@ -4350,6 +4350,45 @@ const start=()=>{const nm=document.getElementById('wDlgName');
  if(nm){new MutationObserver(tick).observe(nm,{childList:true,characterData:true,subtree:true});tick()}else setTimeout(start,500)};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 window.R7={col};
+})();
+
+/* ===== R7b: tablet speed. Starts cheap tablets lighter, steps down further if still slow,
+   and skips drawing far-off places the fog already hides. Never touches 'visible' (quests use it). ===== */
+(function(){
+try{
+const lowEnd=(navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=3;
+const touch=matchMedia&&matchMedia('(pointer:coarse)').matches;
+if(!save.quality&&(lowEnd||touch)){ /* first run on a tablet: skip the "high" try */
+  Q.level='medium';Q.shadows=false;renderer.shadowMap.enabled=false;Q.pr=Math.min(Q.pr,lowEnd?1:1.15);renderer.setPixelRatio(Q.pr);resize()}
+}catch(e){}
+let fr=0,t0=performance.now(),fogSet='';
+(function cnt(){fr++;requestAnimationFrame(cnt)})();
+const ZPOS=new THREE.Vector3(),box=new THREE.Box3(),info=new WeakMap();
+let wg=null,skip=new Set();
+function meta(o){let m=info.get(o);if(m)return m;box.setFromObject(o);
+  if(box.isEmpty()){m={c:null};info.set(o,m);return m}
+  const c=box.getCenter(new THREE.Vector3()),r=box.getSize(ZPOS).length()/2;
+  m={c,r,big:r>45,meshes:[]};o.traverse(x=>{if(x.isMesh||x.isPoints||x.isLine||x.isSprite)m.meshes.push(x)});m.off=false;info.set(o,m);return m}
+function setOff(m,off){if(m.off===off)return;m.off=off;for(const x of m.meshes)x.layers.set(off?1:0)}
+function pass(){
+  if(typeof state==='undefined'||!window.WORLD)return;
+  if(!wg){wg=scene.getObjectByName('WORLD');if(!wg)return}
+  /* fps step-down below 'low' */
+  const now=performance.now(),dt=(now-t0)/1000;
+  if(dt>4){const fps=fr/dt;fr=0;t0=now;
+    if(state==='play'&&!document.hidden&&Q.level==='low'&&fps<26){Q.level='lowest';Q.pr=.62;renderer.setPixelRatio(Q.pr);resize();save.quality={pr:Q.pr,shadows:Q.shadows,level:Q.level}}}
+  /* fog pulls in on slow tablets, so far places can be skipped */
+  const lite=Q.level==='low'||Q.level==='lowest',lo2=Q.level==='lowest';
+  if(scene.fog){const want=Q.level;if(fogSet!==want){fogSet=want;
+    if(lite){scene.fog.near=lo2?26:34;scene.fog.far=lo2?78:100;camera.far=scene.fog.far+30}else{scene.fog.near=Math.min(scene.fog.near,60)||60;scene.fog.far=190;camera.far=300}
+    camera.updateProjectionMatrix()}}
+  const far=(scene.fog?scene.fog.far:190)+6,p=player.pos;
+  skip=new Set();for(const n of (WORLD.npcs||[])){if(n.g)skip.add(n.g);if(n.mk)skip.add(n.mk)}
+  for(const o of wg.children){if(skip.has(o))continue;const m=meta(o);if(!m.c||m.big)continue;
+    const d=Math.hypot(m.c.x-p.x,m.c.z-p.z)-m.r;setOff(m,d>far||(m.r<1.3&&d>(lite?24:55))||(m.r<3&&d>(lite?45:95)))}
+}
+setInterval(()=>{try{pass()}catch(e){}},500);
+window.R7.perf=()=>({level:Q.level,pr:Q.pr,shadows:Q.shadows,fog:scene.fog&&scene.fog.far,off:wg?wg.children.filter(o=>{const m=info.get(o);return m&&m.off}).length:0,total:wg?wg.children.length:0});
 })();
 
 
